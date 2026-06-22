@@ -28,7 +28,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: "*",
+    origin: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true
   })
@@ -114,7 +114,7 @@ app.use("/api/users", userRoutes);
    404 HANDLER
 ========================= */
 
-app.use("*", (req, res) => {
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: "Route not found"
