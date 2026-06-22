@@ -24,7 +24,38 @@ const PORT = process.env.PORT || 5000;
    SECURITY MIDDLEWARES
 ========================= */
 
-app.use(helmet());
+// app.use(helmet());
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+
+        scriptSrc: [
+          "'self'",
+          "https://unpkg.com"
+        ],
+
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://unpkg.com"
+        ],
+
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https:"
+        ],
+
+        connectSrc: [
+          "'self'"
+        ]
+      }
+    }
+  })
+);
 
 app.use(
   cors({
