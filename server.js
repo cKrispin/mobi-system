@@ -57,8 +57,10 @@ app.use((req, res, next) => {
   }
 
   if (req.body) req.body = clean(req.body);
-  if (req.params) req.params = clean(req.params);
-  const cleanedQuery = req.query ? clean(req.query) : {};
+
+  // DO NOT overwrite req.query or req.params
+  req.cleanedQuery = req.query ? clean({ ...req.query }) : {};
+  req.cleanedParams = req.params ? clean({ ...req.params }) : {};
 
   next();
 });
