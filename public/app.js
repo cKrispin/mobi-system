@@ -8,6 +8,11 @@ const map = L.map("map").setView([-4.325, 15.322], 12);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 /* ONBOARDING */
+
+function closeWelcome() {
+    document.getElementById('welcomeOverlay').style.display = 'none';
+}
+
 function closeWelcome() {
     welcomeOverlay.style.display = "none";
     localStorage.setItem("seenWelcome", "yes");
