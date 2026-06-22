@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
-//import helmet from "helmet";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import mongoose from "mongoose";
 
@@ -18,46 +18,89 @@ import feedbackRoutes from "./routes/feedbackRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
-/* SECURITY MIDDLEWARES */
-app.use(cors({
-	origin: "*"
-}));
+/* =========================
+   SECURITY MIDDLEWARES
+========================= */
 
-app.use(express.json());
+app.use(helmet());
 
-/* INPUT SANITIZATION (SAFE VERSION) */
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    credentials: true
+  })
+);
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+/* =========================
+   INPUT SANITIZATION
+========================= */
+
 app.use((req, res, next) => {
-	function clean(obj) {
-		if (!obj || typeof obj !== "object") return obj;
+  function clean(obj) {
+    if (!obj || typeof obj !== "object") return obj;
 
-		for (let key in obj) {
-			if (key.startsWith("$") || key.includes(".")) {
-				delete obj[key];
-			} else if (typeof obj[key] === "object") {
-				clean(obj[key]);
-			}
-		}
-		return obj;
-	}
+    for (const key in obj) {
+      if (key.startsWith("$") || key.includes(".")) {
+        delete obj[key];
+      } else if (typeof obj[key] === "object") {
+        clean(obj[key]);
+      }
+    }
 
-	req.body = clean(req.body);
-	req.params = clean(req.params);
+    return obj;
+  }
 
-	next();
+  if (req.body) req.body = clean(req.body);
+  if (req.params) req.params = clean(req.params);
+  if (req.query) req.query = clean(req.query);
+
+  next();
 });
 
-/* RATE LIMIT */
+/* =========================
+   RATE LIMITING
+========================= */
+
 const limiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	max: 100
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: {
+    success: false,
+    message: "Too many requests. Please try again later."
+  }
 });
+
 app.use(limiter);
 
-/* STATIC FILES */
+/* =========================
+   STATIC FILES
+========================= */
+
 app.use(express.static("public"));
 
-/* ROUTES */
+/* =========================
+   HEALTH CHECK
+========================= */
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    app: "MOBI API",
+    status: "running",
+    environment: process.env.NODE_ENV || "development"
+  });
+});
+
+/* =========================
+   API ROUTES
+========================= */
+
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/routes", routeRoutes);
@@ -65,25 +108,51 @@ app.use("/api/alerts", alertRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/gps", gpsRoutes);
 app.use("/api/feedback", feedbackRoutes);
-app.use("/api/users",userRoutes);
+app.use("/api/users", userRoutes);
 
-/* DB + SERVER */
-mongoose.connect(process.env.MONGO_URI)
-.then(() => {
-	console.log("MongoDB Connected");
+/* =========================
+   404 HANDLER
+========================= */
 
-	app.listen(process.env.PORT || 5000, () => {
-		console.log(`Server running`);
-	});
-})
-.catch(err => console.log(err));
-
-/* ERROR HANDLER */
-app.use((err, req, res, next) => {
-	console.error(err);
-
-	res.status(500).json({
-		success: false,
-		message: "Internal server error"
-	});
+app.use("*", (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found"
+  });
 });
+
+/* =========================
+   GLOBAL ERROR HANDLER
+========================= */
+
+app.use((err, req, res, next) => {
+  console.error("Server Error:", err);
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal server error"
+  });
+});
+
+/* =========================
+   DATABASE CONNECTION
+========================= */
+
+async function startServer() {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+
+    console.log("✅ MongoDB Connected");
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌐 Environment: ${process.env.NODE_ENV || "development"}`);
+    });
+  } catch (error) {
+    console.error("❌ MongoDB connection failed:");
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+startServer();
