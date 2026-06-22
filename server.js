@@ -29,8 +29,7 @@ app.use(helmet());
 app.use(
   cors({
     origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    credentials: true
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   })
 );
 
@@ -68,12 +67,14 @@ app.use((req, res, next) => {
 ========================= */
 
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     success: false,
-    message: "Too many requests. Please try again later."
-  }
+    message: "Too many requests. Please try again later.",
+  },
 });
 
 app.use(limiter);
@@ -93,7 +94,7 @@ app.get("/", (req, res) => {
     success: true,
     app: "MOBI API",
     status: "running",
-    environment: process.env.NODE_ENV || "development"
+    environment: process.env.NODE_ENV || "development",
   });
 });
 
@@ -114,10 +115,10 @@ app.use("/api/users", userRoutes);
    404 HANDLER
 ========================= */
 
-app.use("*", (req, res) => {
+app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: "Route not found"
+    message: "Route not found",
   });
 });
 
@@ -130,27 +131,33 @@ app.use((err, req, res, next) => {
 
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || "Internal server error"
+    message: err.message || "Internal server error",
   });
 });
 
 /* =========================
-   DATABASE CONNECTION
+   DATABASE + SERVER STARTUP
 ========================= */
 
 async function startServer() {
   try {
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined in environment variables");
+    }
+
     await mongoose.connect(process.env.MONGO_URI);
 
     console.log("✅ MongoDB Connected");
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌐 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(
+        `🌐 Environment: ${process.env.NODE_ENV || "development"}`
+      );
     });
   } catch (error) {
-    console.error("❌ MongoDB connection failed:");
-    console.error(error);
+    console.error("❌ Startup failed:");
+    console.error(error.message);
     process.exit(1);
   }
 }
