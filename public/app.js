@@ -376,7 +376,7 @@ try {
 
     const filteredAlerts = data.alerts.filter(alert => {
         const createdAt = new Date(alert.createdAt);
-        return ((now - createdAt) / (1000 * 60 * 60)) <= 3;
+        return ((now - createdAt) / (1000 * 60 * 60)) <= 12;
     });
 
     alertsList.innerHTML =
