@@ -1,168 +1,289 @@
 <!DOCTYPE html>
 <html lang="fr">
 
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1"/>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title>MOBI - Mobilité Intelligente RDC</title>
+    <title>MOBI - Mobilité Intelligente RDC</title>
 
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-        <!--link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"-->
-        <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
 
-    </head>
+<body>
 
-    <body>
+    <!-- =========================
+         ONBOARDING
+    ========================= -->
 
-        <!-- =========================
-            ONBOARDING
-        ========================= -->
+    <div id="welcomeOverlay">
+        <img src="logo.png" class="welcomeLogo" alt="MOBI">
 
-        <div id="welcomeOverlay">
-            <img src="logo.png" class="welcomeLogo" alt="MOBI">
-            <div class="welcomeBox">
+        <div class="welcomeBox">
 
-                <h2>🚍 Bienvenue sur MOBI</h2>
+            <h2>🚍 Bienvenue sur MOBI</h2>
 
-                <p>
-                    Votre partenaire numérique pour une mobilité
-                    intelligente, rapide et sécurisée en RDC.
-                </p>
+            <p>
+                Votre partenaire numérique pour une mobilité
+                intelligente, rapide et sécurisée en RDC.
+            </p>
 
-                <ul>
-                    <li>🚦 Recevoir des alertes de trafic en temps réel</li>
-                    <li>📍 Signaler un incident ou un embouteillage</li>
-                    <li>🗺️ Trouver les itinéraires les plus fluides</li>
-                </ul>
+            <ul>
+                <li>🚦 Recevoir des alertes de trafic en temps réel</li>
+                <li>📍 Signaler un incident ou un embouteillage</li>
+                <li>🗺️ Trouver les itinéraires les plus fluides</li>
+            </ul>
 
-                <button onclick="closeWelcome()">
-                    Commencer maintenant
-                </button>
+            <button id="closeWelcomeBtn">
+                Commencer maintenant
+            </button>
 
-            </div>
+        </div>
+    </div>
+
+    <!-- =========================
+         SIDEBAR
+    ========================= -->
+
+    <div id="sidebar">
+
+        <div class="logo">
+            <img src="/assets/logos/logo-blank.png" alt="Logo">
+
+            <!-- <h1>MOBI RDC</h1> -->
         </div>
 
-        <!-- =========================
-            SIDEBAR
-        ========================= -->
+        <!-- ACCOUNT -->
 
-        <div id="sidebar">
+        <div class="card account-card">
 
-            <div class="logo">
-                <img src="/assets/logos/logo-blank.png" alt="Logo" />
-            <!--h1>MOBI RDC</!--h1-->
-            </div>
+            <h3>👤 Compte utilisateur</h3>
 
-            <div class="card account-card">
-                <h3>👤 Compte utilisateur</h3>
+            <button
+                id="loginBtn"
+                class="btn btn-login">
+                🔐 Connexion
+            </button>
 
-                <button class="btn btn-login" onclick="openLogin()">
-                    🔐 Connexion
-                </button>
+            <button
+                id="registerBtn"
+                class="btn btn-register">
+                👤 Créer un compte
+            </button>
 
-                <button class="btn btn-register" onclick="openRegister()">
-                    👤 Créer un compte
-                </button>
+            <button
+                id="logoutBtn"
+                class="btn btn-logout">
+                🚪 Se déconnecter
+            </button>
 
-                <button class="btn btn-logout" onclick="logout()">
-                    🚪 Se déconnecter
-                </button>
-
-                <div id="authStatus" class="badge offline">🔴 Non connecté</div>
-            </div>
-
-            <div class="card">
-                <h3>🔎 Recherche de trajet</h3>
-                <input id="startPlace" value="" placeholder="📍 Point de départ"/>
-                <input id="endPlace" value="" placeholder="📍 Destination"/>
-                <button onclick="getRoute()">Calculer le trajet</button>
-                <div id="routeInfo"></div>
-            </div>
-
-            <div class="card">
-                <h3>🚦 Créer une alerte de trafic</h3>
-                <input id="road" placeholder="Nom de la route"/>
-                <select id="severity">
-                    <option value="low">🟢 Faible</option>
-                    <option value="medium">🟠 Moyen</option>
-                    <option value="high">🔴 Élevé</option>
-                </select>
-                <input id="description" placeholder="Description"/>
-                <button onclick="createAlert()">Envoyer l’alerte</button>
-            </div>
-
-            <div class="card">
-                <h3>📍 Alertes récentes</h3>
-                <div id="alertsList">Chargement...</div>
-            </div>
-
-            <div class="card">
-                <h3>📊 Résumé du trafic</h3>
-                <div id="summary">Chargement...</div>
-            </div>
-
-            <!-- FEEDBACK-->
-            <div class="card">
-
-                <h3>💬 Votre avis</h3>
-
-                <label>Recherche d'une route</label>
-                <select id="routeFeedback" style="width:100%;margin-bottom:10px;">
-                    <option value="general">Général</option>
-                    <option value="traffic">Trafic</option>
-                    <option value="navigation">Navigation</option>
-                </select>
-
-                <label>Creation d'une Alerte</label>
-                <select id="alertFeedback" style="width:100%;margin-bottom:10px;">
-                    <option value="none">Aucune</option>
-                    <option value="wrong_info">Information incorrecte</option>
-                    <option value="late_update">Mise à jour tardive</option>
-                </select>
-
-                <textarea
-                    id="improvementFeedback"
-                    placeholder="Dites-nous ce que vous pensez de MOBI..."
-                    style="width:100%;height:100px;"
-                ></textarea>
-
-                <button onclick="sendFeedback()" style="margin-top:10px;">
-                    Envoyer
-                </button>
-
+            <div
+                id="authStatus"
+                class="badge offline">
+                🔴 Non connecté
             </div>
 
         </div>
 
-        <!-- =========================
-            MAP
-        ========================= -->
+        <!-- ROUTE SEARCH -->
 
-        <div id="map"></div>
+        <div class="card">
 
-        <!-- =========================
-            MODAL AUTH
-        ========================= -->
+            <h3>🔎 Recherche de trajet</h3>
 
-        <div id="authModal" class="modal">
-            <div class="modal-content">
+            <input
+                id="startPlace"
+                placeholder="📍 Point de départ">
 
-                <h3 id="modalTitle">Connexion</h3>
+            <input
+                id="endPlace"
+                placeholder="📍 Destination">
 
-                <input id="modalEmail" placeholder="Votre nom, ex. Alex Molia ou aMolia" required/>
-                <input id="modalPassword" type="password" placeholder="Mot de passe ou numero Whatsapp" required />
+            <button id="getRouteBtn">
+                Calculer le trajet
+            </button>
 
-                <button id="modalAction">Valider</button>
-                <button onclick="closeModal()" style="background:#aaa;margin-top:10px;">Annuler</button>
+            <div id="routeInfo"></div>
 
-            </div>
         </div>
 
-        <script src="app.js"></script>
+        <!-- ALERT CREATION -->
 
-        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <div class="card">
 
-    </body>
+            <h3>🚦 Créer une alerte de trafic</h3>
+
+            <input
+                id="road"
+                placeholder="Nom de la route">
+
+            <select id="severity">
+
+                <option value="low">
+                    🟢 Faible
+                </option>
+
+                <option value="medium">
+                    🟠 Moyen
+                </option>
+
+                <option value="high">
+                    🔴 Élevé
+                </option>
+
+            </select>
+
+            <input
+                id="description"
+                placeholder="Description">
+
+            <button id="createAlertBtn">
+                Envoyer l’alerte
+            </button>
+
+        </div>
+
+        <!-- RECENT ALERTS -->
+
+        <div class="card">
+
+            <h3>📍 Alertes récentes</h3>
+
+            <div id="alertsList">
+                Chargement...
+            </div>
+
+        </div>
+
+        <!-- SUMMARY -->
+
+        <div class="card">
+
+            <h3>📊 Résumé du trafic</h3>
+
+            <div id="summary">
+                Chargement...
+            </div>
+
+        </div>
+
+        <!-- FEEDBACK -->
+
+        <div class="card">
+
+            <h3>💬 Votre avis</h3>
+
+            <label for="routeFeedback">
+                Recherche d'une route
+            </label>
+
+            <select
+                id="routeFeedback"
+                style="width:100%;margin-bottom:10px;">
+
+                <option value="general">
+                    Général
+                </option>
+
+                <option value="traffic">
+                    Trafic
+                </option>
+
+                <option value="navigation">
+                    Navigation
+                </option>
+
+            </select>
+
+            <label for="alertFeedback">
+                Création d'une alerte
+            </label>
+
+            <select
+                id="alertFeedback"
+                style="width:100%;margin-bottom:10px;">
+
+                <option value="none">
+                    Aucune
+                </option>
+
+                <option value="wrong_info">
+                    Information incorrecte
+                </option>
+
+                <option value="late_update">
+                    Mise à jour tardive
+                </option>
+
+            </select>
+
+            <textarea
+                id="improvementFeedback"
+                placeholder="Dites-nous ce que vous pensez de MOBI..."
+                style="width:100%;height:100px;"></textarea>
+
+            <button
+                id="sendFeedbackBtn"
+                style="margin-top:10px;">
+                Envoyer
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- =========================
+         MAP
+    ========================= -->
+
+    <div id="map"></div>
+
+    <!-- =========================
+         AUTH MODAL
+    ========================= -->
+
+    <div id="authModal" class="modal">
+
+        <div class="modal-content">
+
+            <h3 id="modalTitle">
+                Connexion
+            </h3>
+
+            <input
+                id="modalEmail"
+                placeholder="Votre nom, ex. Alex Molia ou aMolia"
+                required>
+
+            <input
+                id="modalPassword"
+                type="password"
+                placeholder="Mot de passe ou numéro WhatsApp"
+                required>
+
+            <button id="modalAction">
+                Valider
+            </button>
+
+            <button
+                id="closeModalBtn"
+                style="background:#aaa;margin-top:10px;">
+                Annuler
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- LEAFLET MUST LOAD BEFORE app.js -->
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- APPLICATION -->
+
+    <script src="app.js"></script>
+
+</body>
 
 </html>

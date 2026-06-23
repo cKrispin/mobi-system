@@ -1,104 +1,142 @@
 let authToken = localStorage.getItem("token") || "";
-let routeLayer;
+let routeLayer = null;
 let alertMarkers = [];
+let map = null;
 
-/* MAP */
-const map = L.map("map").setView([-4.325, 15.322], 12);
+/* DOM REFERENCES */
+let welcomeOverlay;
+let authModal;
+let modalTitle;
+let modalAction;
+let modalEmail;
+let modalPassword;
+let alertsList;
+let summary;
+let routeInfo;
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-/* ONBOARDING */
+/* =========================
+ONBOARDING
+========================= */
 
 function closeWelcome() {
-    document.getElementById('welcomeOverlay').style.display = 'none';
+welcomeOverlay.style.display = "none";
+localStorage.setItem("seenWelcome", "yes");
 }
 
-function closeWelcome() {
-    welcomeOverlay.style.display = "none";
-    localStorage.setItem("seenWelcome", "yes");
-}
+/* =========================
+AUTH STATUS
+========================= */
 
-window.addEventListener("load", () => {
-    if (localStorage.getItem("seenWelcome")) {
-        welcomeOverlay.style.display = "none";
-    }
-});
-
-/* AUTH STATUS */
 function updateAuthStatus() {
-    const el = document.getElementById("authStatus");
+const el = document.getElementById("authStatus");
 
-    if (authToken) {
-        el.className = "badge online";
-        el.textContent = "🟢 Connecté";
-    } else {
-        el.className = "badge offline";
-        el.textContent = "🔴 Non connecté";
-    }
+
+if (!el) return;
+
+if (authToken) {
+    el.className = "badge online";
+    el.textContent = "🟢 Connecté";
+} else {
+    el.className = "badge offline";
+    el.textContent = "🔴 Non connecté";
 }
 
-/* MODAL */
+
+}
+
+/* =========================
+MODAL
+========================= */
+
 function openLogin() {
-    authModal.style.display = "flex";
-    modalTitle.innerText = "Connexion";
-    modalAction.onclick = login;
+authModal.style.display = "flex";
+modalTitle.textContent = "Connexion";
+
+modalAction.replaceWith(modalAction.cloneNode(true));
+modalAction = document.getElementById("modalAction");
+
+modalAction.addEventListener("click", login);
+
+
 }
 
 function openRegister() {
-    authModal.style.display = "flex";
-    modalTitle.innerText = "Créer un compte";
-    modalAction.onclick = registerUser;
+authModal.style.display = "flex";
+modalTitle.textContent = "Créer un compte";
+
+
+modalAction.replaceWith(modalAction.cloneNode(true));
+modalAction = document.getElementById("modalAction");
+
+modalAction.addEventListener("click", registerUser);
+
+
 }
 
 function closeModal() {
-    authModal.style.display = "none";
+authModal.style.display = "none";
 }
 
-/* REGISTER */
-async function registerUser() {
-    const email = modalEmail.value.trim();
-    const password = modalPassword.value.trim();
+/* =========================
+REGISTER
+========================= */
 
-    if (!email || !password) {
-        alert("Veuillez remplir tous les champs");
+async function registerUser() {
+const email = modalEmail.value.trim();
+const password = modalPassword.value.trim();
+
+if (!email || !password) {
+    alert("Veuillez remplir tous les champs");
+    return;
+}
+
+try {
+    const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            name: "User",
+            email,
+            password
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        alert(data.message || "Erreur inscription");
         return;
     }
 
-    try {
-        const response = await fetch("/api/auth/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                name: "User",
-                email,
-                password
-            })
-        });
+    alert("Compte créé avec succès");
+    closeModal();
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert(data.message || "Erreur inscription");
-            return;
-        }
-
-        alert("Compte créé avec succès");
-        closeModal();
-
-    } catch (err) {
-        console.error(err);
-        alert("Erreur serveur");
-    }
+} catch (err) {
+    console.error(err);
+    alert("Erreur serveur");
 }
 
-/* LOGIN */
+
+}
+
+/* =========================
+LOGIN
+========================= */
+
 async function login() {
+try {
+
+
     const response = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json"
+        },
         body: JSON.stringify({
-            email: modalEmail.value,
-            password: modalPassword.value
+            email: modalEmail.value.trim(),
+            password: modalPassword.value.trim()
         })
     });
 
@@ -115,210 +153,276 @@ async function login() {
     updateAuthStatus();
     closeModal();
 
-    loadAlerts();
-    loadSummary();
+    await loadAlerts();
+    await loadSummary();
+
+} catch (error) {
+    console.error(error);
+    alert("Erreur serveur");
 }
 
-/* LOGOUT */
+
+}
+
+/* =========================
+LOGOUT
+========================= */
+
 function logout() {
-    authToken = "";
-    localStorage.removeItem("token");
+authToken = "";
+localStorage.removeItem("token");
 
-    alertMarkers.forEach(m => map.removeLayer(m));
-    alertMarkers = [];
+alertMarkers.forEach(marker => {
+    if (map) map.removeLayer(marker);
+});
 
-    if (typeof alertsList !== "undefined") {
-        alertsList.innerHTML = "Veuillez vous connecter";
-    }
+alertMarkers = [];
 
-    if (typeof summary !== "undefined") {
-        summary.innerHTML = "Veuillez vous connecter";
-    }
-
-    updateAuthStatus();
+if (alertsList) {
+    alertsList.innerHTML = "Veuillez vous connecter";
 }
 
+if (summary) {
+    summary.innerHTML = "Veuillez vous connecter";
+}
+
+updateAuthStatus();
+
+
+}
+
+/* =========================
+CREATE ALERT
+========================= */
 
 async function createAlert() {
 
-    if (!authToken) {
-        alert("Veuillez vous connecter");
-        return;
-    }
 
-    const road = document.getElementById("road");
-    const description = document.getElementById("description");
-    const severity = document.getElementById("severity");
-
-    if (!road.value.trim() || !description.value.trim()) {
-        alert("Veuillez remplir tous les champs");
-        return;
-    }
-
-    try {
-        const response = await fetch("/api/alerts", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${authToken}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                road: road.value.trim(),
-                description: description.value.trim(),
-                severity: severity.value,
-                type: "Congestion"
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            alert(data.message || "Erreur lors de la création de l'alerte");
-            return;
-        }
-
-        alert("Alerte envoyée avec succès");
-
-        road.value = "";
-        description.value = "";
-
-        loadAlerts();
-        loadSummary();
-
-    } catch (error) {
-        console.error(error);
-        alert("Erreur serveur");
-    }
+if (!authToken) {
+    alert("Veuillez vous connecter");
+    return;
 }
 
+const road = document.getElementById("road");
+const description = document.getElementById("description");
+const severity = document.getElementById("severity");
 
-/* ROUTE */
-async function getRoute() {
-    try {
-        const start = document.getElementById("startPlace");
-        const end = document.getElementById("endPlace");
-
-        if (!start.value.trim() || !end.value.trim()) {
-            alert("Veuillez remplir les deux champs");
-            return;
-        }
-
-        const response = await fetch("/api/routes/recommend-smart", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                startPlace: start.value.trim(),
-                endPlace: end.value.trim()
-            })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || !data.recommendation) {
-            alert(data.error || "Erreur itinéraire");
-            return;
-        }
-
-        routeInfo.innerHTML = `
-            🚗 <b>Distance :</b> ${data.recommendation.distance}
-            <br>
-            ⏱️ <b>Temps :</b> ${data.recommendation.estimatedTime}
-        `;
-
-        if (routeLayer) map.removeLayer(routeLayer);
-
-        if (!data.recommendation.geometry?.coordinates) {
-            alert("Pas de géométrie disponible");
-            return;
-        }
-
-        const coords = data.recommendation.geometry.coordinates.map(c => [c[1], c[0]]);
-
-        routeLayer = L.polyline(coords, { weight: 4 }).addTo(map);
-        map.fitBounds(routeLayer.getBounds());
-
-    } catch (e) {
-        console.error(e);
-        alert("Erreur itinéraire");
-    }
+if (!road.value.trim() || !description.value.trim()) {
+    alert("Veuillez remplir tous les champs");
+    return;
 }
 
-/* ALERT TIME FORMAT */
-function timeAgo(d) {
-    const diff = Math.floor((new Date() - new Date(d)) / 1000);
-
-    if (diff < 60) return `il y a ${diff} sec`;
-
-    const min = Math.floor(diff / 60);
-    if (min < 60) return `il y a ${min} min`;
-
-    const h = Math.floor(diff / 3600);
-    if (h < 24) return `il y a ${h} h`;
-
-    const days = Math.floor(h / 24);
-    return `il y a ${days} jour(s)`;
-}
-
-/* ALERTS */
-async function loadAlerts() {
-    alertMarkers.forEach(m => map.removeLayer(m));
-    alertMarkers = [];
-
-    if (!authToken) {
-        alertsList.innerHTML = "Veuillez vous connecter";
-        return;
-    }
+try {
 
     const response = await fetch("/api/alerts", {
-        headers: { Authorization: `Bearer ${authToken}` }
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            road: road.value.trim(),
+            description: description.value.trim(),
+            severity: severity.value,
+            type: "Congestion"
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        alert(data.message || "Erreur lors de la création de l'alerte");
+        return;
+    }
+
+    alert("Alerte envoyée avec succès");
+
+    road.value = "";
+    description.value = "";
+
+    await loadAlerts();
+    await loadSummary();
+
+} catch (error) {
+    console.error(error);
+    alert("Erreur serveur");
+}
+
+
+}
+
+/* =========================
+ROUTE SEARCH
+========================= */
+
+async function getRoute() {
+
+try {
+
+    const start = document.getElementById("startPlace");
+    const end = document.getElementById("endPlace");
+
+    if (!start.value.trim() || !end.value.trim()) {
+        alert("Veuillez remplir les deux champs");
+        return;
+    }
+
+    const response = await fetch("/api/routes/recommend-smart", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            startPlace: start.value.trim(),
+            endPlace: end.value.trim()
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.recommendation) {
+        alert(data.error || "Erreur itinéraire");
+        return;
+    }
+
+    routeInfo.innerHTML = `
+        🚗 <b>Distance :</b> ${data.recommendation.distance}<br>
+        ⏱️ <b>Temps :</b> ${data.recommendation.estimatedTime}
+    `;
+
+    if (routeLayer) {
+        map.removeLayer(routeLayer);
+    }
+
+    if (!data.recommendation.geometry?.coordinates) {
+        alert("Pas de géométrie disponible");
+        return;
+    }
+
+    const coords =
+        data.recommendation.geometry.coordinates.map(
+            c => [c[1], c[0]]
+        );
+
+    routeLayer =
+        L.polyline(coords, { weight: 4 }).addTo(map);
+
+    map.fitBounds(routeLayer.getBounds());
+
+} catch (error) {
+    console.error(error);
+    alert("Erreur itinéraire");
+}
+
+
+}
+
+/* =========================
+TIME FORMAT
+========================= */
+
+function timeAgo(date) {
+
+
+const diff =
+    Math.floor((new Date() - new Date(date)) / 1000);
+
+if (diff < 60) return `il y a ${diff} sec`;
+
+const min = Math.floor(diff / 60);
+if (min < 60) return `il y a ${min} min`;
+
+const hours = Math.floor(diff / 3600);
+if (hours < 24) return `il y a ${hours} h`;
+
+return `il y a ${Math.floor(hours / 24)} jour(s)`;
+
+
+}
+
+/* =========================
+ALERTS
+========================= */
+
+async function loadAlerts() {
+
+
+if (!alertsList) return;
+
+alertMarkers.forEach(marker => {
+    if (map) map.removeLayer(marker);
+});
+
+alertMarkers = [];
+
+if (!authToken) {
+    alertsList.innerHTML = "Veuillez vous connecter";
+    return;
+}
+
+try {
+
+    const response = await fetch("/api/alerts", {
+        headers: {
+            Authorization: `Bearer ${authToken}`
+        }
     });
 
     const data = await response.json();
 
     if (!data.alerts) return;
 
-    // 🔥 FILTER: only alerts less than 3 hours old
     const now = new Date();
 
-    const filteredAlerts = data.alerts.filter(a => {
-        const createdAt = new Date(a.createdAt);
-        const diffHours = (now - createdAt) / (1000 * 60 * 60);
-        return diffHours <= 3;
+    const filteredAlerts = data.alerts.filter(alert => {
+        const createdAt = new Date(alert.createdAt);
+        return ((now - createdAt) / (1000 * 60 * 60)) <= 3;
     });
 
-    // 🖥️ DISPLAY ONLY FILTERED ALERTS
-    alertsList.innerHTML = filteredAlerts.length
-        ? filteredAlerts
-            .slice(0, 10)
-            .map(a => `
-                <div>
-                    <b>${a.road}</b><br>
-                    ${a.description}<br>
-                    ${timeAgo(a.createdAt)}
-                </div>
-                <hr>
-            `).join("")
-        : "Aucune alerte récente (en moins de 3 heures)";
+    alertsList.innerHTML =
+        filteredAlerts.length
+            ? filteredAlerts
+                .slice(0, 10)
+                .map(alert => `
+                    <div>
+                        <b>${alert.road}</b><br>
+                        ${alert.description}<br>
+                        ${timeAgo(alert.createdAt)}
+                    </div>
+                    <hr>
+                `)
+                .join("")
+            : "Aucune alerte récente";
 
-    // 🗺️ MAP MARKERS ONLY FOR FILTERED ALERTS
-    filteredAlerts.forEach(a => {
-        const marker = L.marker(map.getCenter())
-            .addTo(map)
-            .bindPopup(`<b>${a.road}</b><br>${a.description}`);
-
-        alertMarkers.push(marker);
-    });
+} catch (error) {
+    console.error(error);
 }
-/* SUMMARY */
-async function loadSummary() {
-    if (!authToken) {
-        summary.innerHTML = "Veuillez vous connecter";
-        return;
-    }
 
-    const response = await fetch("/api/alerts/traffic-summary", {
-        headers: { Authorization: `Bearer ${authToken}` }
-    });
+
+}
+
+/* =========================
+SUMMARY
+========================= */
+
+async function loadSummary() {
+
+
+if (!summary) return;
+
+if (!authToken) {
+    summary.innerHTML = "Veuillez vous connecter";
+    return;
+}
+
+try {
+
+    const response =
+        await fetch("/api/alerts/traffic-summary", {
+            headers: {
+                Authorization: `Bearer ${authToken}`
+            }
+        });
 
     const data = await response.json();
 
@@ -330,170 +434,181 @@ async function loadSummary() {
         🟠 Medium : ${data.summary.medium}<br>
         🟢 Low : ${data.summary.low}
     `;
+
+} catch (error) {
+    console.error(error);
 }
 
-/* INIT */
+
+}
+
+/* =========================
+FEEDBACK
+========================= */
+
+async function sendFeedback() {
+
+
+const routeElement =
+    document.getElementById("routeFeedback");
+
+const alertElement =
+    document.getElementById("alertFeedback");
+
+const improvementElement =
+    document.getElementById("improvementFeedback");
+
+if (
+    !routeElement ||
+    !alertElement ||
+    !improvementElement
+) {
+    alert("Erreur formulaire");
+    return;
+}
+
+const improvementFeedback =
+    improvementElement.value.trim();
+
+if (improvementFeedback.length < 5) {
+    alert("Veuillez saisir au moins 5 caractères.");
+    return;
+}
+
+if (!authToken) {
+    alert("Veuillez vous connecter.");
+    return;
+}
+
+try {
+
+    const response = await fetch(
+        "/api/feedback",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+                routeFeedback: routeElement.value,
+                alertFeedback: alertElement.value,
+                improvementFeedback
+            })
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+        throw new Error(
+            data.error || "Erreur envoi"
+        );
+    }
+
+    alert("Merci pour votre avis !");
+
+    improvementElement.value = "";
+    routeElement.selectedIndex = 0;
+    alertElement.selectedIndex = 0;
+
+} catch (error) {
+    console.error(error);
+    alert(error.message);
+}
+
+
+}
+
+/* =========================
+INIT
+========================= */
+
 document.addEventListener("DOMContentLoaded", () => {
-    updateAuthStatus();
+
+
+welcomeOverlay =
+    document.getElementById("welcomeOverlay");
+
+authModal =
+    document.getElementById("authModal");
+
+modalTitle =
+    document.getElementById("modalTitle");
+
+modalAction =
+    document.getElementById("modalAction");
+
+modalEmail =
+    document.getElementById("modalEmail");
+
+modalPassword =
+    document.getElementById("modalPassword");
+
+alertsList =
+    document.getElementById("alertsList");
+
+summary =
+    document.getElementById("summary");
+
+routeInfo =
+    document.getElementById("routeInfo");
+
+map =
+    L.map("map").setView(
+        [-4.325, 15.322],
+        12
+    );
+
+L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+).addTo(map);
+
+if (localStorage.getItem("seenWelcome")) {
+    welcomeOverlay.style.display = "none";
+}
+
+document
+    .getElementById("closeWelcomeBtn")
+    .addEventListener("click", closeWelcome);
+
+document
+    .getElementById("loginBtn")
+    .addEventListener("click", openLogin);
+
+document
+    .getElementById("registerBtn")
+    .addEventListener("click", openRegister);
+
+document
+    .getElementById("logoutBtn")
+    .addEventListener("click", logout);
+
+document
+    .getElementById("getRouteBtn")
+    .addEventListener("click", getRoute);
+
+document
+    .getElementById("createAlertBtn")
+    .addEventListener("click", createAlert);
+
+document
+    .getElementById("sendFeedbackBtn")
+    .addEventListener("click", sendFeedback);
+
+document
+    .getElementById("closeModalBtn")
+    .addEventListener("click", closeModal);
+
+updateAuthStatus();
+
+loadSummary();
+loadAlerts();
+
+setInterval(() => {
     loadSummary();
     loadAlerts();
+}, 30000);
 
-    setInterval(() => {
-        loadSummary();
-        loadAlerts();
-    }, 30000);
+
 });
-
-async function sendFeedback(){
-
-    try{
-
-        /* Find Elements */
-
-        const routeElement =
-        document.getElementById(
-            "routeFeedback"
-        );
-
-        const alertElement =
-        document.getElementById(
-            "alertFeedback"
-        );
-
-        const improvementElement =
-        document.getElementById(
-            "improvementFeedback"
-        );
-
-        /* Verify Elements Exist */
-
-        if(
-            !routeElement ||
-            !alertElement ||
-            !improvementElement
-        ){
-
-            console.error(
-                "Feedback form elements not found"
-            );
-
-            alert(
-                "Erreur de configuration du formulaire de feedback."
-            );
-
-            return;
-
-        }
-
-        const routeFeedback = routeElement.value;
-
-        const alertFeedback = alertElement.value;
-
-        const improvementFeedback = improvementElement.value.trim();
-
-        /* Validation */
-
-        if(improvementFeedback.length < 5){
-
-            alert(
-                "Veuillez saisir au moins 5 caractères."
-            );
-
-            return;
-
-        }
-
-        if(improvementFeedback.length > 500){
-
-            alert(
-                "Votre commentaire est trop long (maximum 500 caractères)."
-            );
-
-            return;
-
-        }
-
-        if(!authToken){
-
-            alert(
-                "Veuillez vous connecter avant d'envoyer un avis."
-            );
-
-            return;
-
-        }
-
-        const response = await fetch(
-
-            "/api/feedback",
-
-            {
-
-                method:"POST",
-
-                headers:{
-
-                    "Content-Type":"application/json",
-
-                    Authorization:
-                    `Bearer ${authToken}`
-
-                },
-
-                body:JSON.stringify({
-
-                    routeFeedback,
-
-                    alertFeedback,
-
-                    improvementFeedback
-
-                })
-
-            }
-
-        );
-
-        const data = await response.json();
-
-        if(!response.ok || !data.success){
-
-            throw new Error(
-
-                data.error ||
-
-                "Erreur lors de l'envoi"
-
-            );
-
-        }
-
-        alert(
-            "Merci pour votre avis !"
-        );
-
-        /* Reset Form */
-
-        improvementElement.value = "";
-
-        routeElement.selectedIndex = 0;
-
-        alertElement.selectedIndex = 0;
-
-    }
-    catch(error){
-
-        console.error(
-            "FEEDBACK ERROR:",
-            error
-        );
-
-        alert(
-            error.message || "Erreur lors de l'envoi du feedback"
-        );
-
-    }
-
-}
-
-
